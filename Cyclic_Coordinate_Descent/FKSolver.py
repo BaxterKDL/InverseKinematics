@@ -117,29 +117,28 @@ class FKSolver:
                 sz += [T.item((2, 3))]
         
         return sx, sy, sz
-                
-    def plot_skeleton(self, xs, ys, zs, fig, proportion=False):
+
+    def plot_skeleton(self, xs, ys, zs, fig=None, proportion=True):
         xs = np.around(xs, 5)
         ys = np.around(ys, 5)
         zs = np.around(zs, 5)
 
-        # print ("xs", xs)
-        # print ("ys", ys)
-        # print ("zs", zs)
+        if fig is None:
+            fig = plt.figure()
+        else:
+            fig = fig
 
-        plt.clf()
-        # fig = plt.figure()
         ax = fig.gca(projection='3d')
         ax.plot(xs, ys, zs, 'ro-')
-        
+
         ax.set_xlabel('X (m)')
         ax.set_ylabel('Y (m)')
         ax.set_zlabel('Z (m)')
-        
+
         if proportion:
-            max_val = max(max(abs(xs)), max(abs(ys)), max(abs(zs)))
+            max_val = 1.2#max(max(abs(xs)), max(abs(ys)), max(abs(zs)))
             ax.set_xlim3d(-max_val, max_val)
             ax.set_ylim3d(-max_val, max_val)
             ax.set_zlim3d(-max_val, max_val)
-        
-        plt.pause(0.0001)
+
+        plt.pause(0.000001)

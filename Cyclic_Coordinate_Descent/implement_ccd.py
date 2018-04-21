@@ -1,5 +1,6 @@
 from ccd import *
 import robot
+import time
 
 def main():
 
@@ -11,16 +12,19 @@ def main():
     for keys in ja_keys:
         seed_angles[keys] = baxter.angle_limits[keys][0]
 
-    seed_angles = {'s0':0, 's1':0, 'e0':0, 'e1':0, 'w0':0, 'w1':0, 'w2':0}
+    # Seed angles for presentation
+    seed_angles = {'s0':-80, 's1':0, 'e0':0, 'e1':0, 'w0':0, 'w1':-50, 'w2':0}
 
     print ("Seed Angles", seed_angles)
 
-    target_position = [0.20, -0.20, 0.25]
+    target_position = [-0.50, -0.40, 0.35]
     e_tol = 0.05
 
     ccd_object = CycCorDes(seed_angles, target_position, e_tol)
 
-    final_angles = ccd_object.exec_ccd()
+    start = time.time()
+    final_angles = ccd_object.exec_ccd(True)
+    print "Time taken :", time.time() - start
 
     print ("Final output Inverse Kinematics Solution", final_angles)
 

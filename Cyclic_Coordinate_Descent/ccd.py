@@ -25,12 +25,12 @@ class CycCorDes:
         self.joint_pp = None
         self.ee_pos = [0,0,0]
         self.joint_anglesdict  = {}
-        self.figure = plt.figure()
+        # self.figure = plt.figure()
 
         self.reversedJointList = []
 
         self.minStepSize = 0.2
-        self.maxStepSize = 2.0
+        self.maxStepSize = 2
         self.stepSize = self.maxStepSize
 
     def angles_to_fkposition(self, currentJointAnglesDict):
@@ -116,7 +116,7 @@ class CycCorDes:
             # print ("Not done ye, trying to get EE on the joining line")
             return False, distance
 
-    def show_animation(self, complete_T, figu):
+    def show_animation(self, complete_T, figu ):
         '''Extract the xs, ys and the zs from all the individual transformation matrices'''
         T_dict = {}
         ja_keys = ['s0', 's1', 'e0', 'e1', 'w0', 'w1', 'w2']
@@ -126,7 +126,7 @@ class CycCorDes:
         xs_a, ys_a, zs_a = self.baxfk.convert2skel(T_dict)
         self.baxfk.plot_skeleton(xs_a, ys_a, zs_a, figu, True)
 
-    def exec_ccd(self, animate=False):
+    def exec_ccd(self, animate =False):
 
         '''Implementing the cyclic Coordinate Descent algorithm'''
 
@@ -144,9 +144,12 @@ class CycCorDes:
         temp_d1 = np.inf
 
         self.reversedJointList = list(ja_keys[0:6])
-        self.reversedJointList.reverse()        
+        self.reversedJointList.reverse()
 
         figu = plt.figure()
+        ax = figu.gca(projection='3d')
+
+        # self.joint_pp = list(self.baxfk.solveIntermediateFK(self.joint_anglesdict))
 
         while True:
 
@@ -169,6 +172,11 @@ class CycCorDes:
                 self.stepSize = self.maxStepSize
 
                 while True:
+
+                    # print ("Angle value for current joint", keyvalue, " is ", self.joint_anglesdict[keyvalue])
+                    # print ("Angle dictionary :", self.joint_anglesdict)
+
+                    # print ("Still working on the joint: ", keyvalue)
                     counter +=1
                     # print ("Counter Value ", counter)
 
@@ -176,7 +184,7 @@ class CycCorDes:
                     updateResult = self.update_angle(flag, self.joint_anglesdict[keyvalue], keyvalue)
 
 
-                    if updateResult !=1000:
+                    if updateResult!=1000:
                         self.joint_anglesdict[keyvalue]= round(updateResult, 2)
                     else:
                         # print("Angle maxed out")
@@ -204,28 +212,30 @@ class CycCorDes:
 
                     self.ee_pos = self.angles_to_fkposition(self.joint_anglesdict)
 
-                    # print ("Angle value for current joint", keyvalue, " is ", self.joint_anglesdict[keyvalue])
+                    ee_OnLineCondition, distanceFromLine  = self.check_ee_on_line_APPROX(self.joint_pos, self.target_position, self.ee_pos, 0.02)
 
-                    ee_OnLineCondition, distanceFromLine  = self.check_ee_on_line_APPROX(self.joint_pos, self.target_position, self.ee_pos, 0.03)
-                    # print ("Still working on the joint: ", keyvalue)
-
-                    if distanceFromLine<0.1:
+                    if distanceFromLine<0.05:
                     	self.stepSize = self.minStepSize
 
-                    #print "Distance from line:",distanceFromLine
+                    # print "Distance from line:",distanceFromLine
 
                     # print ("\nUpdated joint angles dictionary", joint_anglesdict, "\n\n")
 
                     if (ee_OnLineCondition):
                         # print ("Condition 1 satisfied")
                         break
-                if animate:
-                    self.show_animation(self.joint_pp, figu)
 
-            self.ee_pos = self.angles_to_fkposition(self.joint_anglesdict)
-            current_offset = self.cartesian_distance(self.target_position, self.ee_pos)
+                    self.ee_pos = self.angles_to_fkposition(self.joint_anglesdict)
+                    current_offset = self.cartesian_distance(self.target_position, self.ee_pos)
+                    #print ("Distance between EE and target", current_offset)
 
-            #print ("Distance between EE and target", current_offset)
+                    # print self.stepSize
+
+                    if animate:
+                        ax.scatter(self.target_position[0],  self.target_position[1], self.target_position[2], 'g')
+                        self.show_animation(self.joint_pp, figu)
+                        plt.cla()
+
             flag = not flag
 
             # if current_offset < 0.1:
@@ -242,7 +252,7 @@ class CycCorDes:
             #     flag = not flag
             #     # break
         if animate:
-            plt.show()
+            plt.show(block=False)
 
         final_IK_solution = self.joint_anglesdict
         return final_IK_solution
