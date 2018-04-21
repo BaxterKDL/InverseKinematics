@@ -100,6 +100,7 @@ class FKSolver:
         self.solveFK(joint_angles, visualize=True)
     
     def convert2skel(self, T_seqdict):
+
         sx = [0]; sy = [0]; sz = [0]
         offset_dict = {'s0':'d1', 'e0':'d2', 'w0':'d3', 'w2':'d4'}
         
@@ -117,12 +118,17 @@ class FKSolver:
         
         return sx, sy, sz
                 
-    def plot_skeleton(self, xs, ys, zs, proportion=False):
+    def plot_skeleton(self, xs, ys, zs, fig, proportion=False):
         xs = np.around(xs, 5)
         ys = np.around(ys, 5)
         zs = np.around(zs, 5)
-        
-        fig = plt.figure()
+
+        # print ("xs", xs)
+        # print ("ys", ys)
+        # print ("zs", zs)
+
+        plt.clf()
+        # fig = plt.figure()
         ax = fig.gca(projection='3d')
         ax.plot(xs, ys, zs, 'ro-')
         
@@ -136,4 +142,4 @@ class FKSolver:
             ax.set_ylim3d(-max_val, max_val)
             ax.set_zlim3d(-max_val, max_val)
         
-        plt.show()
+        plt.pause(0.0001)

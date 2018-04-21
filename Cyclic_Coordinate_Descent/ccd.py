@@ -1,7 +1,7 @@
 from FKSolver import *
 import numpy  as np
 import robot
-from sympy import *
+import matplotlib.pyplot as plt
 
 
 class CycCorDes:
@@ -25,6 +25,13 @@ class CycCorDes:
         self.joint_pp = None
         self.ee_pos = [0,0,0]
         self.joint_anglesdict  = {}
+        self.figure = plt.figure()
+
+        self.reversedJointList = []
+
+        self.minStepSize = 0.2
+        self.maxStepSize = 2.0
+        self.stepSize = self.maxStepSize
 
     def angles_to_fkposition(self, currentJointAnglesDict):
 
@@ -43,15 +50,15 @@ class CycCorDes:
             dis_sqr += (p1-p2)**2
         return np.sqrt(dis_sqr)
 
-    def update_angle(self, flag, angle, keyvalue, step=0.5):
+    def update_angle(self, flag, angle, keyvalue):
 
         '''Updating the angular position value, either positive or negative with the given step size '''
 
         # Checking the condition for positive or negative increament in joint angular position
         if flag == True:
-            updatedAngle = angle + step
+            updatedAngle = angle + self.stepSize
         else:
-            updatedAngle = angle - step
+            updatedAngle = angle - self.stepSize
 
         # if updatedAngle <= self.baxter.angle_limits[keyvalue][0] :
         #     return self.baxter.angle_limits[keyvalue][0], 1
@@ -66,59 +73,6 @@ class CycCorDes:
         else:
             return 1000
 
-    def check_ee_on_line_EXACT(self, p1, p2, cp):
-
-        '''Checking if the EE lies on the line joining the rotating joint and the target position
-
-        THIS IS ONE EXACT METHOD WHICH MIGHT NOT WORK GIVEN THAT WE IMPLEMENT DISCRETE INCREMENTS, SO THE POINT MIGHT BE
-        REALLY CLOSE TO THE LINE AND MAY STILL NOT LIE ON IT EXACTLY
-
-        '''
-
-        # Using technique from this website - https://brilliant.org/wiki/3d-coordinate-geometry-equation-of-a-line/
-        pos1, pos2, checkpoint = p1, p2, cp
-
-        x, y, z = symbols('x,y,z')
-        axes = [x, y, z]
-
-        def create_line(pos1, pos2):
-
-            '''Define the equation of the line on which the EE should eventually lie to shift the iteration to the next joint '''
-
-            equationPart1, equationPart2 = [], []
-
-            for i, a, b in [0, len(pos1)-1], pos1, pos2:
-                dVectorCoeff = b-a
-                if dVectorCoeff !=0:
-                    equationPart1.append((axes[i] - a)/dVectorCoeff)
-                else:
-                    equationPart2.append(list((axes[i], a)))
-
-            return equationPart1, equationPart2
-
-        def check(pos1, pos2, checkpoint):
-
-            '''Check if the EE lies on the line joining the target position and the joint being rotated'''
-
-            eq1, eq2 = create_line(pos1, pos2)
-            resOld1, resNew1, resOld2, resNew2 = 0, 0, 0, 0
-
-            for indexA, component1 in [0, len(eq1)-1], eq1:
-                resNew1 = component1.subs([(x,checkpoint[0]), (y, checkpoint[1]), (z, checkpoint[2])])
-                if indexA != 0 and resNew1!=resOld1:
-                    return False
-                resOld1 = resNew1
-
-            for indexB, component2 in [0, len(eq2)-1], eq2:
-                resNew2 = component2[0].subs([(x,checkpoint[0]), (y, checkpoint[1]), (z, checkpoint[2])])
-                if resNew2 != component2[1]:
-                    return False
-
-            return True
-
-        flag = check(pos1, pos2, checkpoint)
-
-        return flag
 
     def check_ee_on_line_APPROX(self, p1, p2, cp, tol):
 
@@ -157,12 +111,22 @@ class CycCorDes:
 
         if distance < tolerance:
             # print ("Done - EE lies approximately on the line")
-            return True
+            return True, distance
         else:
             # print ("Not done ye, trying to get EE on the joining line")
-            return False
+            return False, distance
 
-    def exec_ccd(self):
+    def show_animation(self, complete_T, figu):
+        '''Extract the xs, ys and the zs from all the individual transformation matrices'''
+        T_dict = {}
+        ja_keys = ['s0', 's1', 'e0', 'e1', 'w0', 'w1', 'w2']
+        for t_mat, key in zip(complete_T, ja_keys):
+            T_dict[key] = t_mat
+
+        xs_a, ys_a, zs_a = self.baxfk.convert2skel(T_dict)
+        self.baxfk.plot_skeleton(xs_a, ys_a, zs_a, figu, True)
+
+    def exec_ccd(self, animate=False):
 
         '''Implementing the cyclic Coordinate Descent algorithm'''
 
@@ -179,19 +143,30 @@ class CycCorDes:
         flag = True
         temp_d1 = np.inf
 
+        self.reversedJointList = list(ja_keys[0:6])
+        self.reversedJointList.reverse()        
+
+        figu = plt.figure()
+
         while True:
 
             iter_num = -1
             maxout = 0
 
-            # Need to ensure that the farthest joint is moved first and
-            for keyvalue in reversed(ja_keys[0:5]):
+            self.joint_pp = list(self.baxfk.solveIntermediateFK(self.joint_anglesdict))
 
-                # print ("Iteration being done for joint:", keyvalue)
+            # Need to ensure that the farthest joint is moved first
+            for jointIterator in xrange(6):
+
+            	keyvalue = self.reversedJointList[jointIterator]
+
+                #print ("Iteration being done for joint:", keyvalue)
                 iter_num +=1
                 maxout = 0
 
                 temp_d1 = self.cartesian_distance(self.ee_pos, self.target_position)
+
+                self.stepSize = self.maxStepSize
 
                 while True:
                     counter +=1
@@ -231,20 +206,33 @@ class CycCorDes:
 
                     # print ("Angle value for current joint", keyvalue, " is ", self.joint_anglesdict[keyvalue])
 
-                    condition1 = self.check_ee_on_line_APPROX(self.joint_pos, self.target_position, self.ee_pos, 0.03)
+                    ee_OnLineCondition, distanceFromLine  = self.check_ee_on_line_APPROX(self.joint_pos, self.target_position, self.ee_pos, 0.03)
                     # print ("Still working on the joint: ", keyvalue)
+
+                    if distanceFromLine<0.1:
+                    	self.stepSize = self.minStepSize
+
+                    #print "Distance from line:",distanceFromLine
 
                     # print ("\nUpdated joint angles dictionary", joint_anglesdict, "\n\n")
 
-                    if (condition1):
+                    if (ee_OnLineCondition):
                         # print ("Condition 1 satisfied")
                         break
+                if animate:
+                    self.show_animation(self.joint_pp, figu)
 
             self.ee_pos = self.angles_to_fkposition(self.joint_anglesdict)
             current_offset = self.cartesian_distance(self.target_position, self.ee_pos)
 
-            print ("Distance between EE and target", current_offset)
+            #print ("Distance between EE and target", current_offset)
             flag = not flag
+
+            # if current_offset < 0.1:
+            # 	jointIterator = 0
+            # 	self.stepSize = 0.1
+            # 	print "Joint iterator                                                goes back to link 1"
+            # 	return
 
             if current_offset < self.error_tolerance:
                 break
@@ -253,18 +241,8 @@ class CycCorDes:
             #     print ("No solution found in the positive direction, so terminating the process")
             #     flag = not flag
             #     # break
+        if animate:
+            plt.show()
 
         final_IK_solution = self.joint_anglesdict
         return final_IK_solution
-
-
-
-
-
-
-
-
-
-
-
-

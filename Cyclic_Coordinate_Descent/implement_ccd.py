@@ -11,10 +11,12 @@ def main():
     for keys in ja_keys:
         seed_angles[keys] = baxter.angle_limits[keys][0]
 
+    seed_angles = {'s0':0, 's1':0, 'e0':0, 'e1':0, 'w0':0, 'w1':0, 'w2':0}
+
     print ("Seed Angles", seed_angles)
 
-    target_position = [0.10, 0.50, -0.30]
-    e_tol = 0.01
+    target_position = [0.20, -0.20, 0.25]
+    e_tol = 0.05
 
     ccd_object = CycCorDes(seed_angles, target_position, e_tol)
 
